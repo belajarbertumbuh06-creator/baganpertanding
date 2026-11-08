@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Generator Bagan Pertandingan</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- html2pdf for export (optional fallback for basic print) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- html2canvas for PNG export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sport-dark': '#0a192f',
+                        'sport-card': '#112240',
+                        'sport-green': '#00ff88',
+                        'sport-green-hover': '#00cc6a',
+                        'sport-gold': '#ffd700',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+        
+        body {
+            background-color: #0a192f;
+            color: #e6f1ff;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(0, 255, 136, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 150, 255, 0.08), transparent 25%);
+            background-attachment: fixed;
+        }
+
+        /* Bracket Styles */
+        .bracket-container {
+            display: flex;
+            flex-direction: row;
+            overflow-x: auto;
+            padding: 20px;
+            gap: 40px;
+            align-items: center; /* Center vertically */
+            min-height: 500px;
+        }
+
+        .round {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            flex: 1;
+            min-width: 220px;
+            position: relative;
+        }
+
+        .match-card {
+            background: linear-gradient(145deg, #112240, #0d1a30);
+            border: 1px solid #233554;
+            border-radius: 8px;
+            padding: 8px;
+            margin: 15px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: relative;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .match-card:hover {
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        .team-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .team-row:last-child { border-bottom: none; }
+        
+        .team-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 130px;
+        }
+
+        .team-score {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        .winner-text { color: #00ff88; font-weight: bold; }
+        .loser-text { color: #8892b0; }
+        .bye-text { color: #8892b0; font-style: italic; }
+
+        /* Connector Lines */
+        .connector-right {
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            width: 20px;
+            border-bottom: 2px solid #233554;
+        }
+        .connector-vertical {
+            position: absolute;
+            right: -20px;
+            border-right: 2px solid #233554;
+            width: 20px;
+        }
+        .connector-left {
+            position: absolute;
+            left: -20px;
+            top: 50%;
+            width: 20px;
+            border-bottom: 2px solid #233554;
+        }
+
+        /* Champion Node */
+        .champion-card {
+            background: linear-gradient(135deg, #ffd700, #b8860b);
+            color: #000;
+            border: 2px solid #fff;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0a192f; }
+        ::-webkit-scrollbar-thumb { background: #233554; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff88; }
+
+        /* Print Styles */
+        @media print {
+            body { background: white; color: black; background-image: none; }
+            .no-print { display: none !important; }
+            .match-card { background: white; border: 1px solid #ccc; box-shadow: none; }
+            .team-row { border-bottom: 1px solid #eee; }
+            .team-score { background: #f0f0f0; }
+            .champion-card { background: gold; color: black; box-shadow: none; border: 1px solid #000; }
+            .connector-right, .connector-left, .connector-vertical { border-color: #999; }
+            .bracket-container { overflow: visible; flex-wrap: wrap; }
+        }
+        
+        .glass-panel {
+            background: rgba(17, 34, 64, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Teks Mengetik & Bergerak */
+        .wiggle-container {
+            animation: wiggle 3s ease-in-out infinite;
+            display: inline-block;
+            position: relative;
+        }
+        
+        .typewriter-text {
+            display: inline-block;
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: 3px solid #00ff88;
+            max-width: 0;
+            animation: typing 3s steps(20, end) forwards, blink-caret 0.75s step-end infinite;
+        }
+
+        @keyframes typing {
+            from { max-width: 0; }
+            to { max-width: 300px; } /* Lebar maksimal teks */
+        }
+
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #00ff88 }
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-2deg) scale(1); }
+            50% { transform: rotate(2deg) scale(1.05); }
+        }
+
+        /* Bola Memantul */
+        .bounce-ball {
+            position: absolute;
+            z-index: 10;
+            filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.4));
+        }
+        .ball-1 {
+            top: -15px;
+            left: -20px;
+            font-size: 1.5rem;
+            animation: float-bounce-1 2s ease-in-out infinite alternate;
+        }
+        .ball-2 {
+            bottom: -5px;
+            right: -35px;
+            font-size: 1.8rem;
+            animation: float-bounce-2 2.5s ease-in-out infinite alternate;
+        }
+        .ball-3 {
+            top: -25px;
+            right: 15px;
+            font-size: 1.2rem;
+            animation: float-bounce-3 1.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes float-bounce-1 {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-15px) rotate(-90deg); }
+        }
+        @keyframes float-bounce-2 {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-20px) rotate(120deg); }
+        }
+        @keyframes float-bounce-3 {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-10px) rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="font-sans antialiased text-gray-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- UTILITY FUNCTIONS ---
+        // Determine nearest power of 2
+        const getNextPowerOf2 = (n) => Math.pow(2, Math.ceil(Math.log2(n)));
+
+        // Generate standard seeding order for knockout brackets
+        const getSeedingOrder = (bracketSize) => {
+            if (bracketSize <= 1) return [1];
+            let order = [1, 2];
+            for (let i = 1; i < Math.log2(bracketSize); i++) {
+                const nextOrder = [];
+                const sum = Math.pow(2, i + 1) + 1;
+                for (let j = 0; j < order.length; j++) {
+                    nextOrder.push(order[j]);
+                    nextOrder.push(sum - order[j]);
+                }
+                order = nextOrder;
+            }
+            return order;
+        };
+
+        // Create initial bracket structure
+        const generateKnockoutBracket = (teamsList, include3rdPlace) => {
+            const numTeams = teamsList.length;
+            if (numTeams < 2) return null;
+
+            const bracketSize = getNextPowerOf2(numTeams);
+            const numByes = bracketSize - numTeams;
+            const totalRounds = Math.log2(bracketSize);
+            
+            let rounds = [];
+            let matchCounter = 1;
+
+            // Generate Match Nodes per Round
+            for (let r = 0; r < totalRounds; r++) {
+                let roundMatches = [];
+                let matchesInRound = bracketSize / Math.pow(2, r + 1);
+                
+                for (let m = 0; m < matchesInRound; m++) {
+                    roundMatches.push({
+                        id: `R${r + 1}-M${m + 1}`,
+                        round: r + 1,
+                        matchNo: matchCounter++,
+                        team1: null,
+                        team2: null,
+                        score1: null,
+                        score2: null,
+                        winner: null,
+                        loser: null, // needed for 3rd place
+                        nextMatchId: r < totalRounds - 1 ? `R${r + 2}-M${Math.floor(m / 2) + 1}` : 'CHAMPION',
+                        nextMatchSlot: m % 2 === 0 ? 'team1' : 'team2',
+                        isFinished: false
+                    });
+                }
+                rounds.push(roundMatches);
+            }
+
+            // --- Seeding & BYE Logic (Standard Pro Bracket Algorithm) ---
+            const seedOrder = getSeedingOrder(bracketSize);
+            let firstRoundMatches = rounds[0];
+            
+            // Map teams to bracket slots based on standard seeding order
+            for (let m = 0; m < firstRoundMatches.length; m++) {
+                const seed1 = seedOrder[m * 2];
+                const seed2 = seedOrder[m * 2 + 1];
+
+                // If seed number is within number of actual teams, assign the team. Otherwise leave null (will become BYE)
+                firstRoundMatches[m].team1 = seed1 <= numTeams ? teamsList[seed1 - 1] : null;
+                firstRoundMatches[m].team2 = seed2 <= numTeams ? teamsList[seed2 - 1] : null;
+            }
+
+            // Auto-advance BYEs
+            firstRoundMatches.forEach(match => {
+                let advancedTeam = null;
+                if (match.team1 && !match.team2) {
+                    match.team2 = { name: 'BYE', isBye: true };
+                    advancedTeam = match.team1;
+                } else if (!match.team1 && match.team2) {
+                    match.team1 = { name: 'BYE', isBye: true };
+                    advancedTeam = match.team2;
+                }
+
+                if (advancedTeam) {
+                    match.winner = advancedTeam;
+                    match.isFinished = true;
+                    // Advance to next round
+                    if (match.nextMatchId !== 'CHAMPION') {
+                        const nextRoundIndex = rounds.findIndex(r => r.some(m => m.id === match.nextMatchId));
+                        const nextMatch = rounds[nextRoundIndex].find(m => m.id === match.nextMatchId);
+                        nextMatch[match.nextMatchSlot] = advancedTeam;
+                    }
+                }
+            });
+
+            // 3rd Place Match
+            let thirdPlaceMatch = null;
+            if (include3rdPlace && totalRounds > 1) {
+                thirdPlaceMatch = {
+                    id: '3RD-PLACE',
+                    round: '3rd',
+                    matchNo: matchCounter,
+                    title: 'Perebutan Juara 3',
+                    team1: null,
+                    team2: null,
+                    score1: null,
+                    score2: null,
+                    winner: null,
+                    isFinished: false
+                };
+            }
+
+            return { rounds, thirdPlaceMatch, champion: null };
+        };
+
+
+        // --- COMPONENTS ---
+
+        const ModalError = ({ message, onClose }) => (
+            <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+                <div className="bg-sport-card border border-red-500 p-6 rounded-xl max-w-sm w-full text-center shadow-2xl">
+                    <i className="ph ph-warning-circle text-4xl text-red-500 mb-4 inline-block"></i>
+                    <h3 className="text-xl font-bold mb-2">Peringatan</h3>
+                    <p className="text-gray-300 mb-6">{message}</p>
+                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold w-full transition">Tutup</button>
+                </div>
+            </div>
+        );
+
+        const ModalScore = ({ match, onSave, onClose }) => {
+            const [s1, setS1] = useState(match.score1 || '');
+            const [s2, setS2] = useState(match.score2 || '');
+            const t1Name = match.team1 ? match.team1.name : 'TBD';
+            const t2Name = match.team2 ? match.team2.name : 'TBD';
+
+            const handleSave = () => {
+                const score1 = parseInt(s1);
+                const score2 = parseInt(s2);
+                if (isNaN(score1) || isNaN(score2)) return;
+                
+                let winner, loser;
+                if (score1 > score2) { winner = match.team1; loser = match.team2; }
+                else if (score2 > score1) { winner = match.team2; loser = match.team1; }
+                else return; // Don't allow draws in knockout for simplicity here
+
+                onSave(match.id, score1, score2, winner, loser);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+                    <div className="bg-sport-card border border-sport-green p-6 rounded-xl w-96 shadow-[0_0_20px_rgba(0,255,136,0.2)]">
+                        <h3 className="text-xl font-bold mb-4 text-center border-b border-gray-700 pb-2">
+                            {match.title || `Pertandingan ${match.matchNo}`}
+                        </h3>
+                        
+                        <div className="flex justify-between items-center mb-6 gap-4">
+                            <div className="flex-1 text-center">
+                                <p className="font-semibold truncate mb-2">{t1Name}</p>
+                                <input type="number" value={s1} onChange={e=>setS1(e.target.value)} className="w-16 bg-sport-dark border border-gray-600 rounded p-2 text-center text-xl font-bold text-white focus:border-sport-green outline-none" min="0" />
+                            </div>
+                            <div className="text-2xl font-black text-gray-500">VS</div>
+                            <div className="flex-1 text-center">
+                                <p className="font-semibold truncate mb-2">{t2Name}</p>
+                                <input type="number" value={s2} onChange={e=>setS2(e.target.value)} className="w-16 bg-sport-dark border border-gray-600 rounded p-2 text-center text-xl font-bold text-white focus:border-sport-green outline-none" min="0" />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button onClick={onClose} className="flex-1 bg-gray-600 hover:bg-gray-500 py-2 rounded-lg font-semibold transition">Batal</button>
+                            <button onClick={handleSave} className="flex-1 bg-sport-green hover:bg-sport-green-hover text-sport-dark py-2 rounded-lg font-bold shadow-[0_0_10px_rgba(0,255,136,0.4)] transition">Simpan Hasil</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            // State: Config
+            const [tourneyName, setTourneyName] = useState('Turnamen Olahraga');
+            const [sport, setSport] = useState('Sepak Bola');
+            const [type, setType] = useState('gugur');
+            const [numTeamsStr, setNumTeamsStr] = useState('8');
+            const [has3rdPlace, setHas3rdPlace] = useState(true);
+            const [numSeeds, setNumSeeds] = useState(4);
+            
+            // State: Teams
+            const [teams, setTeams] = useState(Array.from({length: 8}, (_, i) => ({ id: i, name: `Tim ${i+1}` })));
+            
+            // State: Bracket Data
+            const [bracket, setBracket] = useState(null);
+            const [activeTab, setActiveTab] = useState('setup'); // setup, bracket
+            
+            // State: UI
+            const [errorMsg, setErrorMsg] = useState(null);
+            const [editingMatch, setEditingMatch] = useState(null);
+
+            const bracketRef = useRef();
+
+            // Handlers
+            const handleNumTeamsChange = (e) => {
+                const val = e.target.value;
+                setNumTeamsStr(val);
+                const num = parseInt(val) || 0;
+                if(num > 0 && num <= 64) {
+                    let newTeams = [...teams];
+                    if(num > newTeams.length) {
+                        for(let i = newTeams.length; i < num; i++) newTeams.push({ id: i, name: `Tim ${i+1}` });
+                    } else {
+                        newTeams = newTeams.slice(0, num);
+                    }
+                    setTeams(newTeams);
+                    if(numSeeds > num) setNumSeeds(num);
+                }
+            };
+
+            const handleTeamNameChange = (index, newName) => {
+                const updated = [...teams];
+                updated[index].name = newName;
+                setTeams(updated);
+            };
+
+            const handleGenerate = () => {
+                if(!tourneyName.trim()) return setErrorMsg("Nama turnamen harus diisi!");
+                const num = parseInt(numTeamsStr);
+                if(isNaN(num) || num < 2 || num > 64) return setErrorMsg("Jumlah peserta harus antara 2 - 64!");
+                
+                // Check empty names
+                const hasEmpty = teams.some(t => !t.name.trim());
+                if(hasEmpty) return setErrorMsg("Semua nama tim harus diisi!");
+
+                // Check duplicate names
+                const names = teams.map(t => t.name.trim().toLowerCase());
+                const uniqueNames = new Set(names);
+                if(uniqueNames.size !== names.length) return setErrorMsg("Terdapat nama tim yang sama!");
+
+                // Generate Data Structure
+                const bracketData = generateKnockoutBracket(teams, has3rdPlace);
+                setBracket(bracketData);
+                setActiveTab('bracket');
+            };
+
+            const handleScoreSave = (matchId, s1, s2, winner, loser) => {
+                let newBracket = { ...bracket };
+                let foundMatch = null;
+                let currentRoundIndex = -1;
+
+                // Find and update match
+                if(matchId === '3RD-PLACE') {
+                    newBracket.thirdPlaceMatch.score1 = s1;
+                    newBracket.thirdPlaceMatch.score2 = s2;
+                    newBracket.thirdPlaceMatch.winner = winner;
+                    newBracket.thirdPlaceMatch.isFinished = true;
+                } else {
+                    for(let r=0; r<newBracket.rounds.length; r++) {
+                        let m = newBracket.rounds[r].find(m => m.id === matchId);
+                        if(m) {
+                            m.score1 = s1;
+                            m.score2 = s2;
+                            m.winner = winner;
+                            m.loser = loser;
+                            m.isFinished = true;
+                            foundMatch = m;
+                            currentRoundIndex = r;
+                            break;
+                        }
+                    }
+
+                    if(foundMatch) {
+                        // Propagate Winner to Next Round
+                        if (foundMatch.nextMatchId === 'CHAMPION') {
+                            newBracket.champion = winner;
+                        } else {
+                            const nextRound = newBracket.rounds[currentRoundIndex + 1];
+                            const nextMatch = nextRound.find(m => m.id === foundMatch.nextMatchId);
+                            if(nextMatch) {
+                                nextMatch[foundMatch.nextMatchSlot] = winner;
+                                // Reset downstream if changed
+                                nextMatch.score1 = null; nextMatch.score2 = null; nextMatch.winner = null; nextMatch.isFinished = false;
+                            }
+                        }
+
+                        // Propagate Losers to 3rd Place match if this is Semifinals
+                        if (has3rdPlace && currentRoundIndex === newBracket.rounds.length - 2) {
+                            // Find both matches in semi final
+                            const semiFinals = newBracket.rounds[currentRoundIndex];
+                            if(semiFinals.length === 2 && semiFinals[0].isFinished && semiFinals[1].isFinished) {
+                                newBracket.thirdPlaceMatch.team1 = semiFinals[0].loser;
+                                newBracket.thirdPlaceMatch.team2 = semiFinals[1].loser;
+                                // reset 3rd place result
+                                newBracket.thirdPlaceMatch.score1 = null;
+                                newBracket.thirdPlaceMatch.score2 = null;
+                                newBracket.thirdPlaceMatch.winner = null;
+                                newBracket.thirdPlaceMatch.isFinished = false;
+                            }
+                        }
+                    }
+                }
+
+                setBracket(newBracket);
+                setEditingMatch(null);
+            };
+
+            const handlePrint = () => {
+                window.print();
+            };
+
+            const handleDownloadPDF = () => {
+                const element = bracketRef.current;
+                
+                // Mencegah elemen terpotong (ter-crop) saat didownload jika ada scrollbar
+                const originalOverflow = element.style.overflow;
+                const originalWidth = element.style.width;
+                element.style.overflow = 'visible';
+                element.style.width = 'max-content';
+
+                const opt = {
+                    margin:       10,
+                    filename:     `${tourneyName.replace(/\s+/g, '_')}_Bagan.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true, scrollY: 0, scrollX: 0 },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                };
+                
+                html2pdf().set(opt).from(element).save().then(() => {
+                    // Mengembalikan style seperti semula
+                    element.style.overflow = originalOverflow;
+                    element.style.width = originalWidth;
+                });
+            };
+
+            const handleDownloadPNG = () => {
+                const element = bracketRef.current;
+                
+                // Mencegah elemen terpotong (ter-crop) saat didownload jika ada scrollbar
+                const originalOverflow = element.style.overflow;
+                const originalWidth = element.style.width;
+                element.style.overflow = 'visible';
+                element.style.width = 'max-content';
+
+                html2canvas(element, { 
+                    scale: 2, 
+                    useCORS: true,
+                    backgroundColor: '#0a192f' // Menggunakan warna tema aplikasi
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `${tourneyName.replace(/\s+/g, '_')}_Bagan.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    
+                    // Mengembalikan style seperti semula
+                    element.style.overflow = originalOverflow;
+                    element.style.width = originalWidth;
+                });
+            };
+
+            // Render Helpers
+            const getTeamClass = (match, teamSlot) => {
+                if(!match.isFinished) return "";
+                if(match.winner && match[teamSlot] && match.winner.id === match[teamSlot].id) return "winner-text";
+                return "loser-text";
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header - No Print */}
+                    <header className="bg-sport-card border-b border-gray-800 p-4 sticky top-0 z-40 shadow-lg no-print">
+                        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-gradient-to-br from-sport-green to-blue-500 p-2 rounded-lg text-sport-dark z-20 relative">
+                                    <i className="ph-fill ph-trophy text-2xl"></i>
+                                </div>
+                                <div className="ml-2 relative">
+                                    {/* Bola Memantul di sekeliling teks */}
+                                    <div className="bounce-ball ball-1">⚽</div>
+                                    <div className="bounce-ball ball-2">🏐</div>
+                                    <div className="bounce-ball ball-3">⚽</div>
+                                    
+                                    <div className="wiggle-container pt-1">
+                                        <h1 className="text-2xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-sport-green to-blue-400">
+                                            <span className="typewriter-text">Project By : AAW</span>
+                                        </h1>
+                                    </div>
+                                    <p className="text-xs text-gray-400 -mt-1 pl-1 relative z-20">Generator Bagan Olahraga PJOK</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex gap-2 bg-sport-dark p-1 rounded-lg">
+                                <button onClick={() => setActiveTab('setup')} className={`px-6 py-2 rounded-md font-semibold transition ${activeTab === 'setup' ? 'bg-sport-card text-sport-green shadow' : 'text-gray-400 hover:text-white'}`}>
+                                    <i className="ph ph-gear mr-2"></i>Pengaturan
+                                </button>
+                                <button onClick={() => { if(bracket) setActiveTab('bracket')}} disabled={!bracket} className={`px-6 py-2 rounded-md font-semibold transition ${activeTab === 'bracket' ? 'bg-sport-card text-sport-green shadow' : 'text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'}`}>
+                                    <i className="ph ph-tree-structure mr-2"></i>Bagan
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content Area */}
+                    <main className="flex-grow p-4 md:p-8 container mx-auto">
+                        
+                        {/* TAB: SETUP */}
+                        {activeTab === 'setup' && (
+                            <div className="max-w-4xl mx-auto space-y-6 fade-in">
+                                {/* Panel 1: Info Turnamen */}
+                                <div className="glass-panel p-6 rounded-2xl">
+                                    <h2 className="text-xl font-bold text-white mb-6 border-b border-gray-700 pb-2 flex items-center gap-2">
+                                        <i className="ph ph-info text-sport-green"></i> 1. Identitas Turnamen
+                                    </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-400 mb-2">Nama Turnamen</label>
+                                            <input type="text" value={tourneyName} onChange={e=>setTourneyName(e.target.value)} placeholder="Contoh: Classmeet Bola Voli 2026" className="w-full bg-sport-dark border border-gray-700 rounded-lg p-3 text-white focus:border-sport-green outline-none transition" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-400 mb-2">Jenis Olahraga</label>
+                                            <select value={sport} onChange={e=>setSport(e.target.value)} className="w-full bg-sport-dark border border-gray-700 rounded-lg p-3 text-white focus:border-sport-green outline-none transition appearance-none">
+                                                <option>Sepak Bola</option>
+                                                <option>Bola Voli</option>
+                                                <option>Futsal</option>
+                                                <option>Bola Basket</option>
+                                                <option>Bulu Tangkis</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-400 mb-2">Sistem Pertandingan</label>
+                                            <div className="flex gap-2">
+                                                <button onClick={()=>setType('gugur')} className={`flex-1 py-3 rounded-lg font-bold border transition ${type==='gugur' ? 'bg-sport-green/10 border-sport-green text-sport-green' : 'bg-sport-dark border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+                                                    Gugur Tunggal
+                                                </button>
+                                                <button disabled className="flex-1 py-3 rounded-lg font-bold border bg-sport-dark border-gray-700 text-gray-600 opacity-50 cursor-not-allowed" title="Fitur ini akan segera hadir">
+                                                    Liga / Grup (Pro)
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-400 mb-2">Jumlah Peserta (Tim)</label>
+                                            <div className="flex gap-2">
+                                                <select value={numTeamsStr} onChange={handleNumTeamsChange} className="flex-1 bg-sport-dark border border-gray-700 rounded-lg p-3 text-white focus:border-sport-green outline-none transition appearance-none">
+                                                    <option value="4">4 Tim</option>
+                                                    <option value="8">8 Tim</option>
+                                                    <option value="16">16 Tim</option>
+                                                    <option value="32">32 Tim</option>
+                                                    <option value="64">64 Tim (Max)</option>
+                                                </select>
+                                                <input type="number" value={numTeamsStr} onChange={handleNumTeamsChange} placeholder="Custom (Mis: 13)" className="w-1/3 bg-sport-dark border border-gray-700 rounded-lg p-3 text-center text-white focus:border-sport-green outline-none" min="2" max="64"/>
+                                            </div>
+                                            {parseInt(numTeamsStr) && getNextPowerOf2(parseInt(numTeamsStr)) !== parseInt(numTeamsStr) && (
+                                                <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
+                                                    <i className="ph ph-info"></i> Sistem otomatis menambah {getNextPowerOf2(parseInt(numTeamsStr)) - parseInt(numTeamsStr)} BYE.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Panel 2: Input Tim */}
+                                <div className="glass-panel p-6 rounded-2xl">
+                                    <h2 className="text-xl font-bold text-white mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+                                        <i className="ph-fill ph-star text-sport-gold"></i> 2. Seeding Teratas & Nama Tim
+                                    </h2>
+                                    
+                                    {/* SEEDING SECTION */}
+                                    <div className="mb-4 p-4 bg-sport-dark/60 border border-sport-gold/40 rounded-xl relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-sport-gold text-sport-dark text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                            PRIORITAS BYE & POSISI
+                                        </div>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="text-sport-gold font-bold text-sm flex items-center gap-1">
+                                                <i className="ph-fill ph-ranking"></i> Tim Unggulan (Seeding)
+                                            </h3>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-gray-400">Jumlah Unggulan:</span>
+                                                <div className="flex bg-gray-800 rounded">
+                                                    <button onClick={() => setNumSeeds(Math.max(0, numSeeds - 1))} className="px-2 py-1 hover:bg-gray-700 rounded-l transition">-</button>
+                                                    <span className="px-2 py-1 font-bold min-w-[24px] text-center">{numSeeds}</span>
+                                                    <button onClick={() => setNumSeeds(Math.min(teams.length, numSeeds + 1))} className="px-2 py-1 hover:bg-gray-700 rounded-r transition">+</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                            {teams.slice(0, numSeeds).map((t, i) => (
+                                                <div key={t.id} className="relative group">
+                                                    <span className="absolute left-3 top-2.5 text-xs font-black text-sport-gold">{i+1}.</span>
+                                                    <input 
+                                                        type="text" 
+                                                        value={t.name}
+                                                        onChange={(e) => handleTeamNameChange(i, e.target.value)}
+                                                        className="w-full bg-sport-card border border-sport-gold/50 shadow-[0_0_10px_rgba(255,215,0,0.1)] rounded-lg py-2 pl-8 pr-3 text-sm text-white focus:border-sport-gold outline-none transition"
+                                                    />
+                                                </div>
+                                            ))}
+                                            {numSeeds === 0 && <p className="text-xs text-gray-500 italic col-span-full">Tidak ada tim unggulan khusus. Penempatan diacak.</p>}
+                                        </div>
+                                    </div>
+
+                                    {/* REGULAR TEAMS */}
+                                    <div className="flex justify-between items-center mb-3 mt-6 px-2">
+                                        <h3 className="text-blue-400 font-bold text-sm">Tim Reguler (Lainnya)</h3>
+                                        <div className="text-xs bg-sport-dark px-2 py-1 rounded text-gray-400">
+                                            Total: <strong className="text-white">{teams.length}</strong>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[35vh] overflow-y-auto pr-2 pb-2 custom-scrollbar">
+                                        {teams.slice(numSeeds).map((t, idx) => {
+                                            const originalIndex = idx + numSeeds;
+                                            return (
+                                                <div key={t.id} className="relative">
+                                                    <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-500">{originalIndex+1}.</span>
+                                                    <input 
+                                                        type="text" 
+                                                        value={t.name}
+                                                        onChange={(e) => handleTeamNameChange(originalIndex, e.target.value)}
+                                                        className="w-full bg-sport-dark border border-gray-700 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-blue-400 focus:bg-[#1a2c4e] outline-none transition"
+                                                    />
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Panel 3: Opsi & Generate */}
+                                <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gradient-to-r from-sport-card to-sport-dark p-4 rounded-xl border border-gray-700">
+                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                        <div className="relative">
+                                            <input type="checkbox" checked={has3rdPlace} onChange={()=>setHas3rdPlace(!has3rdPlace)} className="sr-only" />
+                                            <div className={`block w-14 h-8 rounded-full transition ${has3rdPlace ? 'bg-sport-green' : 'bg-gray-600'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform ${has3rdPlace ? 'translate-x-6' : ''}`}></div>
+                                        </div>
+                                        <div className="text-sm">
+                                            <p className="font-bold text-white group-hover:text-sport-green transition">Perebutan Juara 3</p>
+                                            <p className="text-gray-400 text-xs">Tambahkan laga antar tim kalah di Semifinal</p>
+                                        </div>
+                                    </label>
+
+                                    <button onClick={handleGenerate} className="w-full md:w-auto bg-gradient-to-r from-sport-green to-emerald-500 hover:from-sport-green-hover hover:to-emerald-400 text-sport-dark font-black text-lg py-3 px-10 rounded-xl shadow-[0_0_20px_rgba(0,255,136,0.3)] hover:shadow-[0_0_30px_rgba(0,255,136,0.6)] transition transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                                        <i className="ph-bold ph-lightning"></i> GENERATE BAGAN
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: BRACKET VIEW */}
+                        {activeTab === 'bracket' && bracket && (
+                            <div className="fade-in">
+                                {/* Print Header (Hidden normally) */}
+                                <div className="hidden print:block text-center mb-8 border-b-2 border-black pb-4">
+                                    <h1 className="text-3xl font-black uppercase">{tourneyName}</h1>
+                                    <p className="text-xl">{sport} - Kategori Umum</p>
+                                </div>
+
+                                {/* Action Bar - No Print */}
+                                <div className="flex flex-wrap justify-between items-center bg-sport-card p-4 rounded-xl mb-6 border border-gray-700 shadow-lg no-print gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div>
+                                            <h2 className="text-lg font-bold text-white">{tourneyName}</h2>
+                                            <span className="text-xs bg-sport-dark text-sport-green px-2 py-1 rounded border border-sport-green">{sport}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button onClick={handlePrint} className="bg-white hover:bg-gray-200 text-black px-3 py-2 rounded font-bold flex items-center gap-1 transition shadow text-sm">
+                                            <i className="ph ph-printer"></i> Cetak
+                                        </button>
+                                        <button onClick={handleDownloadPDF} className="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded font-bold flex items-center gap-1 transition shadow text-sm">
+                                            <i className="ph ph-file-pdf"></i> PDF
+                                        </button>
+                                        <button onClick={handleDownloadPNG} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded font-bold flex items-center gap-1 transition shadow text-sm">
+                                            <i className="ph ph-image"></i> PNG
+                                        </button>
+                                        <button onClick={()=>setActiveTab('setup')} className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded font-bold transition text-sm ml-2">
+                                            Edit Data
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-center text-gray-400 text-sm mb-2 no-print"><i className="ph ph-cursor-click"></i> Klik kotak pertandingan untuk memasukkan skor</p>
+
+                                {/* THE BRACKET */}
+                                <div className="glass-panel rounded-2xl overflow-hidden relative" ref={bracketRef}>
+                                    <div className="bracket-container custom-scrollbar">
+                                        {bracket.rounds.map((roundMatches, roundIndex) => (
+                                            <div key={`R${roundIndex}`} className="round">
+                                                {/* Round Title */}
+                                                <div className="text-center mb-4 sticky top-0 z-10 no-print">
+                                                    <span className="bg-sport-dark text-sport-gold font-bold px-4 py-1 rounded-full text-xs border border-gray-700 shadow-lg">
+                                                        {roundIndex === bracket.rounds.length - 1 ? 'FINAL' 
+                                                        : roundIndex === bracket.rounds.length - 2 ? 'SEMIFINAL'
+                                                        : roundIndex === bracket.rounds.length - 3 ? 'PEREMPAT FINAL'
+                                                        : `BABAK ${roundIndex + 1}`}
+                                                    </span>
+                                                </div>
+
+                                                {/* Matches in this round */}
+                                                {roundMatches.map((match, matchIndex) => {
+                                                    const isFinalRound = roundIndex === bracket.rounds.length - 1;
+                                                    // Drawing lines logic (Simplified based on flex layout)
+                                                    const hasNext = !isFinalRound;
+                                                    const isTopMatch = matchIndex % 2 === 0;
+
+                                                    return (
+                                                        <div key={match.id} className="relative flex-1 flex flex-col justify-center py-2">
+                                                            
+                                                            <div 
+                                                                className={`match-card ${match.isFinished ? 'border-gray-600' : 'border-gray-500'} ${match.team1?.isBye || match.team2?.isBye ? 'opacity-70 grayscale' : ''}`}
+                                                                onClick={() => { if(!match.team1?.isBye && !match.team2?.isBye && match.team1 && match.team2) setEditingMatch(match) }}
+                                                            >
+                                                                {/* Match Number Label */}
+                                                                <span className="absolute -top-3 -left-2 bg-sport-dark border border-gray-600 text-[10px] text-gray-400 px-2 rounded-full no-print">M{match.matchNo}</span>
+                                                                
+                                                                {/* Team 1 */}
+                                                                <div className={`team-row ${getTeamClass(match, 'team1')}`}>
+                                                                    <span className={`team-name ${match.team1?.isBye ? 'bye-text' : ''}`}>
+                                                                        {match.team1 ? match.team1.name : '-'}
+                                                                    </span>
+                                                                    <span className="team-score">{match.score1 !== null ? match.score1 : '-'}</span>
+                                                                </div>
+                                                                
+                                                                {/* Team 2 */}
+                                                                <div className={`team-row ${getTeamClass(match, 'team2')}`}>
+                                                                    <span className={`team-name ${match.team2?.isBye ? 'bye-text' : ''}`}>
+                                                                        {match.team2 ? match.team2.name : '-'}
+                                                                    </span>
+                                                                    <span className="team-score">{match.score2 !== null ? match.score2 : '-'}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* CSS Draw Lines (Desktop/Print mostly) */}
+                                                            {hasNext && (
+                                                                <div className="hidden md:block">
+                                                                    <div className="connector-right"></div>
+                                                                    {isTopMatch ? (
+                                                                        <div className="connector-vertical" style={{ top: '50%', height: 'calc(100% + 15px)' }}></div>
+                                                                    ) : (
+                                                                        <div className="connector-vertical" style={{ bottom: '50%', height: 'calc(100% + 15px)' }}></div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {roundIndex > 0 && (
+                                                                <div className="hidden md:block connector-left"></div>
+                                                            )}
+
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ))}
+
+                                        {/* Champion Column */}
+                                        <div className="round justify-center" style={{ flex: 0.8 }}>
+                                             <div className="text-center mb-8 sticky top-0 z-10 no-print">
+                                                <span className="bg-sport-dark text-sport-green font-bold px-4 py-1 rounded-full text-xs border border-sport-green shadow-lg">JUARA</span>
+                                            </div>
+                                            <div className="champion-card relative">
+                                                 <div className="hidden md:block connector-left" style={{ left: '-40px', width: '40px'}}></div>
+                                                <i className="ph-fill ph-crown text-4xl mb-2 block text-white opacity-80 print:text-black"></i>
+                                                <h3 className="text-2xl font-black truncate">
+                                                    {bracket.champion ? bracket.champion.name : '???'}
+                                                </h3>
+                                            </div>
+
+                                            {/* 3rd Place Rendering */}
+                                            {bracket.thirdPlaceMatch && (
+                                                <div className="mt-16 text-center">
+                                                     <div className="mb-2">
+                                                        <span className="bg-[#cd7f32] text-white font-bold px-3 py-1 rounded text-xs">JUARA 3</span>
+                                                    </div>
+                                                    <div 
+                                                        className="match-card border-[#cd7f32]"
+                                                        onClick={() => { if(bracket.thirdPlaceMatch.team1 && bracket.thirdPlaceMatch.team2) setEditingMatch(bracket.thirdPlaceMatch) }}
+                                                    >
+                                                        <div className={`team-row ${getTeamClass(bracket.thirdPlaceMatch, 'team1')}`}>
+                                                            <span className="team-name">{bracket.thirdPlaceMatch.team1 ? bracket.thirdPlaceMatch.team1.name : 'TBD'}</span>
+                                                            <span className="team-score">{bracket.thirdPlaceMatch.score1 !== null ? bracket.thirdPlaceMatch.score1 : '-'}</span>
+                                                        </div>
+                                                        <div className={`team-row ${getTeamClass(bracket.thirdPlaceMatch, 'team2')}`}>
+                                                            <span className="team-name">{bracket.thirdPlaceMatch.team2 ? bracket.thirdPlaceMatch.team2.name : 'TBD'}</span>
+                                                            <span className="team-score">{bracket.thirdPlaceMatch.score2 !== null ? bracket.thirdPlaceMatch.score2 : '-'}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                    </main>
+
+                    {/* Modals */}
+                    {errorMsg && <ModalError message={errorMsg} onClose={() => setErrorMsg(null)} />}
+                    {editingMatch && <ModalScore match={editingMatch} onSave={handleScoreSave} onClose={() => setEditingMatch(null)} />}
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
